@@ -546,55 +546,66 @@ impl App {
         let available_agents = agent::detect_available_agents();
 
         // Setup based on mode
-        let (db, project_path, project_name, tmux_project_name, project_config, trust_warning) = match &mode {
-            AppMode::Dashboard => (
-                None,
-                None,
-                "Dashboard".to_string(),
-                tmux::safe_session_name("Dashboard"),
-                ProjectConfig::default(),
-                None,
-            ),
-            AppMode::Project(path) => {
-                let canonical = path.canonicalize().unwrap_or_else(|_| path.clone());
-                let name = canonical
-                    .file_name()
-                    .and_then(|n| n.to_str())
-                    .unwrap_or("unknown")
-                    .to_string();
-                let tmux_name = tmux::safe_session_name(&name);
-                let mut project_config = ProjectConfig::load(&canonical).unwrap_or_default();
-                let db = Database::open_project(&canonical)?;
+        let (db, project_path, project_name, tmux_project_name, project_config, trust_warning) =
+            match &mode {
+                AppMode::Dashboard => (
+                    None,
+                    None,
+                    "Dashboard".to_string(),
+                    tmux::safe_session_name("Dashboard"),
+                    ProjectConfig::default(),
+                    None,
+                ),
+                AppMode::Project(path) => {
+                    let canonical = path.canonicalize().unwrap_or_else(|_| path.clone());
+                    let name = canonical
+                        .file_name()
+                        .and_then(|n| n.to_str())
+                        .unwrap_or("unknown")
+                        .to_string();
+                    let tmux_name = tmux::safe_session_name(&name);
+                    let mut project_config = ProjectConfig::load(&canonical).unwrap_or_default();
+                    let db = Database::open_project(&canonical)?;
 
-                // Trust-on-first-use: suppress dangerous config fields from untrusted projects
-                let trust_store = crate::config::TrustStore::load().unwrap_or_default();
-                let trust_warning = if !trust_store.is_trusted(&canonical) {
-                    if project_config.init_script.is_some() || project_config.copy_files.is_some() || project_config.cleanup_script.is_some() {
-                        tracing::warn!(
-                            project = %canonical.display(),
-                            "Untrusted project config — init_script, cleanup_script, and copy_files suppressed"
-                        );
-                        project_config.init_script = None;
-                        project_config.cleanup_script = None;
-                        project_config.copy_files = None;
-                        Some("Untrusted project config: init_script, cleanup_script, and copy_files disabled. Run `agtx trust` to enable.".to_string())
+                    // Trust-on-first-use: suppress dangerous config fields from untrusted projects
+                    let trust_store = crate::config::TrustStore::load().unwrap_or_default();
+                    let trust_warning = if !trust_store.is_trusted(&canonical) {
+                        if project_config.init_script.is_some()
+                            || project_config.copy_files.is_some()
+                            || project_config.cleanup_script.is_some()
+                        {
+                            tracing::warn!(
+                                project = %canonical.display(),
+                                "Untrusted project config — init_script, cleanup_script, and copy_files suppressed"
+                            );
+                            project_config.init_script = None;
+                            project_config.cleanup_script = None;
+                            project_config.copy_files = None;
+                            Some("Untrusted project config: init_script, cleanup_script, and copy_files disabled. Run `agtx trust` to enable.".to_string())
+                        } else {
+                            None
+                        }
                     } else {
                         None
-                    }
-                } else {
-                    None
-                };
+                    };
 
-                // Register project in global database
-                let project = crate::db::Project::new(&name, canonical.to_string_lossy());
-                global_db.upsert_project(&project)?;
+                    // Register project in global database
+                    let project = crate::db::Project::new(&name, canonical.to_string_lossy());
+                    global_db.upsert_project(&project)?;
 
-                // Ensure tmux session exists for this project
-                ensure_project_tmux_session(&tmux_name, &canonical, tmux_ops.as_ref());
+                    // Ensure tmux session exists for this project
+                    ensure_project_tmux_session(&tmux_name, &canonical, tmux_ops.as_ref());
 
-                (Some(db), Some(canonical), name, tmux_name, project_config, trust_warning)
-            }
-        };
+                    (
+                        Some(db),
+                        Some(canonical),
+                        name,
+                        tmux_name,
+                        project_config,
+                        trust_warning,
+                    )
+                }
+            };
 
         let config = MergedConfig::merge(&global_config, &project_config);
 
@@ -712,10 +723,7 @@ impl App {
                 let _ = recover_task_session(
                     task,
                     &app.state.tmux_project_name,
-                    app.state
-                        .project_path
-                        .as_deref()
-                        .unwrap_or(Path::new(".")),
+                    app.state.project_path.as_deref().unwrap_or(Path::new(".")),
                     app.state.tmux_ops.as_ref(),
                     agent_ops.as_ref(),
                 );
@@ -1362,10 +1370,7 @@ impl App {
                                 .fg(selected_color)
                                 .add_modifier(Modifier::BOLD),
                         ),
-                        Span::styled(
-                            state.input_buffer.clone(),
-                            Style::default().fg(text_color),
-                        ),
+                        Span::styled(state.input_buffer.clone(), Style::default().fg(text_color)),
                     ]));
                 }
                 InputMode::SelectPlugin => {
@@ -2291,8 +2296,7 @@ impl App {
         } else if deps_blocked {
             let lock_span = Span::styled(
                 "\u{2298} ",
-                Style::default()
-                    .fg(hex_to_color(&theme.color_dimmed)),
+                Style::default().fg(hex_to_color(&theme.color_dimmed)),
             );
             let title_spans = Line::from(vec![lock_span, Span::styled(title, title_style)]);
             let title_line = Paragraph::new(title_spans);
@@ -2591,7 +2595,9 @@ impl App {
                 InputMode::Normal => {
                     // Ctrl+f = fullscreen attach (handled here since handle_normal_key only gets KeyCode)
                     if key.code == KeyCode::Char('f')
-                        && key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL)
+                        && key
+                            .modifiers
+                            .contains(crossterm::event::KeyModifiers::CONTROL)
                     {
                         if let Some(task) = self.state.board.selected_task() {
                             if let Some(window_name) = task.session_name.clone() {
@@ -2705,7 +2711,8 @@ impl App {
             self.state.config = crate::config::MergedConfig::merge(&global_config, &project_config);
             self.state.flags.no_init_scripts = false;
             self.state.warning_message = Some((
-                "Project trusted. init_script, cleanup_script, and copy_files are now active.".to_string(),
+                "Project trusted. init_script, cleanup_script, and copy_files are now active."
+                    .to_string(),
                 Instant::now(),
             ));
         }
@@ -3594,8 +3601,7 @@ impl App {
             }
             KeyCode::Delete => {
                 if self.state.input_cursor < self.state.input_buffer.len() {
-                    let end =
-                        next_char_boundary(&self.state.input_buffer, self.state.input_cursor);
+                    let end = next_char_boundary(&self.state.input_buffer, self.state.input_cursor);
                     self.state.input_buffer.drain(self.state.input_cursor..end);
                 }
             }
@@ -3952,8 +3958,7 @@ impl App {
             }
             KeyCode::Delete => {
                 if self.state.input_cursor < self.state.input_buffer.len() {
-                    let end =
-                        next_char_boundary(&self.state.input_buffer, self.state.input_cursor);
+                    let end = next_char_boundary(&self.state.input_buffer, self.state.input_cursor);
                     self.state.input_buffer.drain(self.state.input_cursor..end);
                 }
             }
@@ -4354,8 +4359,10 @@ impl App {
             if current_status == TaskStatus::Backlog {
                 if let Some(db) = &self.state.db {
                     if !db.deps_satisfied(&task) {
-                        self.state.warning_message =
-                            Some(("Dependencies not in Review/Done — cannot start task".to_string(), Instant::now()));
+                        self.state.warning_message = Some((
+                            "Dependencies not in Review/Done — cannot start task".to_string(),
+                            Instant::now(),
+                        ));
                         return Ok(());
                     }
                 }
@@ -4711,8 +4718,14 @@ impl App {
         if let Some(session_name) = &task.session_name {
             let plugin = self.load_task_plugin(task);
             let task_content = task.content_text();
-            let skill_cmd =
-                resolve_skill_command(&plugin, "review", &review_agent, &task_content, task.cycle, &task.id);
+            let skill_cmd = resolve_skill_command(
+                &plugin,
+                "review",
+                &review_agent,
+                &task_content,
+                task.cycle,
+                &task.id,
+            );
             let prompt = resolve_prompt(&plugin, "review", &task_content, &task.id, task.cycle);
             let prompt_trigger = resolve_prompt_trigger(&plugin, "review");
             let auto_dismiss = plugin
@@ -5078,8 +5091,10 @@ impl App {
         // Block when dependencies are not satisfied
         if let Some(db) = &self.state.db {
             if !db.deps_satisfied(&task) {
-                self.state.warning_message =
-                    Some(("Dependencies not in Review/Done — cannot start task".to_string(), Instant::now()));
+                self.state.warning_message = Some((
+                    "Dependencies not in Review/Done — cannot start task".to_string(),
+                    Instant::now(),
+                ));
                 return Ok(());
             }
         }
@@ -5473,9 +5488,7 @@ impl App {
             if let Some(db) = &self.state.db {
                 let _ = match &result {
                     Ok(()) => db.mark_transition_processed(&req.id, None),
-                    Err(e) => {
-                        db.mark_transition_processed(&req.id, Some(&e.to_string()))
-                    }
+                    Err(e) => db.mark_transition_processed(&req.id, Some(&e.to_string())),
                 };
             }
             self.refresh_tasks()?;
@@ -5513,9 +5526,7 @@ impl App {
             "move_forward" | "move_to_planning" | "move_to_running" | "research"
         );
         if is_forward && task.status == TaskStatus::Backlog && !db.deps_satisfied(&task) {
-            anyhow::bail!(
-                "Cannot advance task: dependencies not in Review/Done"
-            );
+            anyhow::bail!("Cannot advance task: dependencies not in Review/Done");
         }
 
         match req.action.as_str() {
@@ -5657,8 +5668,14 @@ impl App {
         if let Some(session_name) = &task.session_name {
             let plugin = self.load_task_plugin(task);
             let task_content = task.content_text();
-            let skill_cmd =
-                resolve_skill_command(&plugin, "review", &review_agent, &task_content, task.cycle, &task.id);
+            let skill_cmd = resolve_skill_command(
+                &plugin,
+                "review",
+                &review_agent,
+                &task_content,
+                task.cycle,
+                &task.id,
+            );
             let prompt = resolve_prompt(&plugin, "review", &task_content, &task.id, task.cycle);
             let prompt_trigger = resolve_prompt_trigger(&plugin, "review");
             let auto_dismiss = plugin
@@ -5709,8 +5726,7 @@ impl App {
 
         // If orchestrator is running, open the popup to view it
         if is_orchestrator_live(self.state.tmux_ops.as_ref(), &orch_target) {
-            let first_time =
-                self.state.orchestrator_session.as_deref() != Some(&orch_target);
+            let first_time = self.state.orchestrator_session.as_deref() != Some(&orch_target);
             self.state.orchestrator_session = Some(orch_target.clone());
 
             if first_time {
@@ -5788,6 +5804,17 @@ impl App {
 
         let agent_cmd = agent.build_orchestrator_command(&mcp_json_str, &agtx_bin);
 
+        // Prepare the project root before starting the agent. Codex reads
+        // project-local MCP/skill config on startup, so late deployment can
+        // leave the orchestrator without the agtx tools or skill.
+        write_agent_mcp_config(&project_path, &project_path, &default_agent);
+        deploy_skill(
+            &project_path,
+            "agtx-orchestrate",
+            skills::ORCHESTRATE_SKILL,
+            &default_agent,
+        );
+
         // Ensure project tmux session exists
         ensure_project_tmux_session(
             &tmux_project_name,
@@ -5826,16 +5853,12 @@ impl App {
             capture_tmux_pane_with_history(&orch_target, 500, self.state.tmux_ops.as_ref());
         self.state.shell_popup = Some(popup);
 
-        // Deploy orchestrate skill to project root so the agent can discover it
-        deploy_skill(
-            &project_path,
-            "agtx-orchestrate",
-            skills::ORCHESTRATE_SKILL,
-            &default_agent,
-        );
-
         if let Some(ref db) = self.state.db {
-            run_orchestrator_catchup(db, &self.state.board.tasks, self.state.project_path.as_deref());
+            run_orchestrator_catchup(
+                db,
+                &self.state.board.tasks,
+                self.state.project_path.as_deref(),
+            );
         }
 
         // Send the /agtx:orchestrate command once the agent is ready
@@ -5865,11 +5888,7 @@ impl App {
                     .unwrap_or(true)
                 {
                     let agent_ops = self.state.agent_registry.get(&task.agent);
-                    let project_path = self
-                        .state
-                        .project_path
-                        .as_deref()
-                        .unwrap_or(Path::new("."));
+                    let project_path = self.state.project_path.as_deref().unwrap_or(Path::new("."));
                     let _ = recover_task_session(
                         task,
                         &self.state.tmux_project_name,
@@ -5949,9 +5968,14 @@ impl App {
             // window_name is already session:window format, use it directly.
             let _ = std::process::Command::new("tmux")
                 .args([
-                    "-L", tmux::AGENT_SERVER,
-                    "select-window", "-t", window_name,
-                    ";", "resize-window", "-A",
+                    "-L",
+                    tmux::AGENT_SERVER,
+                    "select-window",
+                    "-t",
+                    window_name,
+                    ";",
+                    "resize-window",
+                    "-A",
                 ])
                 .output();
         } else {
@@ -5969,10 +5993,18 @@ impl App {
             // Unset $TMUX so tmux allows attaching when inside a different tmux.
             let _ = std::process::Command::new("tmux")
                 .args([
-                    "-L", tmux::AGENT_SERVER,
-                    "attach", "-t", session,
-                    ";", "select-window", "-t", window_name,
-                    ";", "resize-window", "-A",
+                    "-L",
+                    tmux::AGENT_SERVER,
+                    "attach",
+                    "-t",
+                    session,
+                    ";",
+                    "select-window",
+                    "-t",
+                    window_name,
+                    ";",
+                    "resize-window",
+                    "-A",
                 ])
                 .env_remove("TMUX")
                 .status();
@@ -6075,7 +6107,9 @@ impl App {
         // Check window still exists
         if !is_orchestrator_live(self.state.tmux_ops.as_ref(), &orch_target) {
             self.state.orchestrator_session = None;
-            self.state.orchestrator_ready.store(false, Ordering::Release);
+            self.state
+                .orchestrator_ready
+                .store(false, Ordering::Release);
             return;
         }
 
@@ -6721,7 +6755,6 @@ fn copy_back_to_project(worktree: &Path, project_root: &Path, entries: &[String]
     }
 }
 
-
 /// Generate a URL-safe slug from task ID and title
 fn generate_task_slug(task_id: &str, title: &str) -> String {
     let title_slug: String = title
@@ -6892,18 +6925,23 @@ fn setup_task_worktree(
     let target = format!("{}:{}", tmux_project_name, window_name);
 
     // Create git worktree from the configured base branch
-    let worktree_path_str =
-        match git_ops.create_worktree(project_path, &unique_slug, base_branch, worktree_dir, branch_prefix) {
-            Ok(path) => path,
-            Err(e) => {
-                eprintln!("Failed to create worktree: {}", e);
-                project_path
-                    .join(worktree_dir)
-                    .join(&unique_slug)
-                    .to_string_lossy()
-                    .to_string()
-            }
-        };
+    let worktree_path_str = match git_ops.create_worktree(
+        project_path,
+        &unique_slug,
+        base_branch,
+        worktree_dir,
+        branch_prefix,
+    ) {
+        Ok(path) => path,
+        Err(e) => {
+            eprintln!("Failed to create worktree: {}", e);
+            project_path
+                .join(worktree_dir)
+                .join(&unique_slug)
+                .to_string_lossy()
+                .to_string()
+        }
+    };
 
     // Initialize worktree: copy files and run init script
     // Merge plugin-level copy_files with project-level copy_files
@@ -7343,11 +7381,7 @@ fn send_key_to_tmux(
         _ => return,
     };
 
-    let key_str = if has_alt {
-        format!("M-{}", base)
-    } else {
-        base
-    };
+    let key_str = if has_alt { format!("M-{}", base) } else { base };
 
     let _ = tmux_ops.send_keys_literal(window_name, &key_str);
 }
@@ -8468,11 +8502,7 @@ fn kill_windows_by_name(tmux_ops: &dyn TmuxOperations, target: &str) -> bool {
 }
 
 /// Replay "completed phase" notifications for tasks whose artifact is on disk.
-fn run_orchestrator_catchup(
-    db: &Database,
-    tasks: &[Task],
-    project_path: Option<&Path>,
-) {
+fn run_orchestrator_catchup(db: &Database, tasks: &[Task], project_path: Option<&Path>) {
     let existing: HashSet<String> = db
         .peek_notifications()
         .unwrap_or_default()
@@ -8893,99 +8923,8 @@ fn write_skills_to_worktree(
         }
     }
 
-    // Write project-scoped MCP server config for each configured agent.
-    // Use the project root path (not the worktree path) so the MCP server opens
-    // the correct project DB where tasks are stored.
-    let agtx_bin = std::env::current_exe()
-        .unwrap_or_else(|_| std::path::PathBuf::from("agtx"))
-        .to_string_lossy()
-        .to_string();
-    let project_path_str = project_path.to_string_lossy().to_string();
     for agent_name in agent_names {
-        match *agent_name {
-            "claude" => {
-                let cfg = serde_json::json!({
-                    "mcpServers": {
-                        "agtx": { "command": agtx_bin, "args": ["mcp-serve", &project_path_str] }
-                    }
-                });
-                let _ = std::fs::write(
-                    Path::new(worktree_path).join(".mcp.json"),
-                    serde_json::to_string_pretty(&cfg).unwrap_or_default(),
-                );
-            }
-            "codex" => {
-                let toml = format!(
-                    "[mcp_servers.agtx]\ncommand = \"{}\"\nargs = [\"mcp-serve\", \"{}\"]\n",
-                    agtx_bin, project_path_str
-                );
-                let dir = Path::new(worktree_path).join(".codex");
-                let _ = std::fs::create_dir_all(&dir);
-                let _ = std::fs::write(dir.join("config.toml"), toml);
-
-                // Codex only loads project-local .codex/config.toml for trusted paths.
-                // Add a trust entry for this worktree to ~/.codex/config.toml.
-                if let Ok(home) = std::env::var("HOME") {
-                    let global_config_path = Path::new(&home).join(".codex").join("config.toml");
-                    let trust_entry = format!(
-                        "\n[projects.\"{}\"]\ntrust_level = \"trusted\"\n",
-                        worktree_path
-                    );
-                    let existing = std::fs::read_to_string(&global_config_path).unwrap_or_default();
-                    if !existing.contains(worktree_path) {
-                        let _ = std::fs::OpenOptions::new()
-                            .create(true)
-                            .append(true)
-                            .open(&global_config_path)
-                            .and_then(|mut f| {
-                                use std::io::Write;
-                                f.write_all(trust_entry.as_bytes())
-                            });
-                    }
-                }
-            }
-            "gemini" => {
-                let cfg = serde_json::json!({
-                    "mcpServers": {
-                        "agtx": { "command": agtx_bin, "args": ["mcp-serve", &project_path_str], "trust": true }
-                    }
-                });
-                let dir = Path::new(worktree_path).join(".gemini");
-                let _ = std::fs::create_dir_all(&dir);
-                let _ = std::fs::write(
-                    dir.join("settings.json"),
-                    serde_json::to_string_pretty(&cfg).unwrap_or_default(),
-                );
-            }
-            "cursor" => {
-                let cfg = serde_json::json!({
-                    "mcpServers": {
-                        "agtx": { "command": agtx_bin, "args": ["mcp-serve", &project_path_str] }
-                    }
-                });
-                let dir = Path::new(worktree_path).join(".cursor");
-                let _ = std::fs::create_dir_all(&dir);
-                let _ = std::fs::write(
-                    dir.join("mcp.json"),
-                    serde_json::to_string_pretty(&cfg).unwrap_or_default(),
-                );
-            }
-            "opencode" => {
-                let cfg = serde_json::json!({
-                    "mcp": {
-                        "agtx": {
-                            "type": "local",
-                            "command": [&agtx_bin, "mcp-serve", &project_path_str]
-                        }
-                    }
-                });
-                let _ = std::fs::write(
-                    Path::new(worktree_path).join("opencode.json"),
-                    serde_json::to_string_pretty(&cfg).unwrap_or_default(),
-                );
-            }
-            _ => {}
-        }
+        write_agent_mcp_config(Path::new(worktree_path), project_path, agent_name);
     }
 
     // Write to agent-native discovery paths (e.g. .claude/commands/agtx/)
@@ -9035,6 +8974,119 @@ fn write_skills_to_worktree(
             }
         }
     }
+}
+
+/// Write project-scoped MCP server config for one agent into `target_path`.
+/// `project_path` is deliberately the project root, not a task worktree, so
+/// MCP tools operate on the board database that owns the tasks.
+fn write_agent_mcp_config(target_path: &Path, project_path: &Path, agent_name: &str) {
+    let agtx_bin = std::env::current_exe()
+        .unwrap_or_else(|_| std::path::PathBuf::from("agtx"))
+        .to_string_lossy()
+        .to_string();
+    let project_path_str = project_path.to_string_lossy().to_string();
+
+    match agent_name {
+        "claude" => {
+            let cfg = serde_json::json!({
+                "mcpServers": {
+                    "agtx": { "command": agtx_bin, "args": ["mcp-serve", &project_path_str] }
+                }
+            });
+            let _ = std::fs::write(
+                target_path.join(".mcp.json"),
+                serde_json::to_string_pretty(&cfg).unwrap_or_default(),
+            );
+        }
+        "codex" => {
+            let toml = format!(
+                "[mcp_servers.agtx]\ncommand = \"{}\"\nargs = [\"mcp-serve\", \"{}\"]\n",
+                toml_basic_string(&agtx_bin),
+                toml_basic_string(&project_path_str)
+            );
+            let dir = target_path.join(".codex");
+            let _ = std::fs::create_dir_all(&dir);
+            let _ = std::fs::write(dir.join("config.toml"), toml);
+            write_codex_trust_entry(target_path);
+        }
+        "gemini" => {
+            let cfg = serde_json::json!({
+                "mcpServers": {
+                    "agtx": { "command": agtx_bin, "args": ["mcp-serve", &project_path_str], "trust": true }
+                }
+            });
+            let dir = target_path.join(".gemini");
+            let _ = std::fs::create_dir_all(&dir);
+            let _ = std::fs::write(
+                dir.join("settings.json"),
+                serde_json::to_string_pretty(&cfg).unwrap_or_default(),
+            );
+        }
+        "cursor" => {
+            let cfg = serde_json::json!({
+                "mcpServers": {
+                    "agtx": { "command": agtx_bin, "args": ["mcp-serve", &project_path_str] }
+                }
+            });
+            let dir = target_path.join(".cursor");
+            let _ = std::fs::create_dir_all(&dir);
+            let _ = std::fs::write(
+                dir.join("mcp.json"),
+                serde_json::to_string_pretty(&cfg).unwrap_or_default(),
+            );
+        }
+        "opencode" => {
+            let cfg = serde_json::json!({
+                "mcp": {
+                    "agtx": {
+                        "type": "local",
+                        "command": [&agtx_bin, "mcp-serve", &project_path_str]
+                    }
+                }
+            });
+            let _ = std::fs::write(
+                target_path.join("opencode.json"),
+                serde_json::to_string_pretty(&cfg).unwrap_or_default(),
+            );
+        }
+        _ => {}
+    }
+}
+
+fn write_codex_trust_entry(target_path: &Path) {
+    let Ok(home) = std::env::var("HOME") else {
+        return;
+    };
+    let global_config_path = Path::new(&home).join(".codex").join("config.toml");
+    if let Some(parent) = global_config_path.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+
+    let target = target_path.to_string_lossy();
+    let escaped_target = toml_basic_string(target.as_ref());
+    let trust_entry = codex_trust_entry(target.as_ref());
+    let existing = std::fs::read_to_string(&global_config_path).unwrap_or_default();
+    if !existing.contains(&escaped_target) {
+        let _ = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&global_config_path)
+            .and_then(|mut f| {
+                use std::io::Write;
+                f.write_all(trust_entry.as_bytes())
+            });
+    }
+}
+
+fn codex_trust_entry(project_path: &str) -> String {
+    format!(
+        "\n[projects.\"{}\"]\ntrust_level = \"trusted\"\n",
+        toml_basic_string(project_path)
+    )
+}
+
+fn toml_basic_string(value: &str) -> String {
+    value.replace('\\', "\\\\").replace('"', "\\\"")
 }
 
 /// Deploy a single skill to a target directory for the given agent.
