@@ -83,6 +83,7 @@ workflow_plugin = "agtx"
 base_branch = "main"
 
 [agents]
+research = "codex"
 planning = "codex"
 running = "codex"
 review = "codex"

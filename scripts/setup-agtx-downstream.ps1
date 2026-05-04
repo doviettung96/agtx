@@ -114,6 +114,7 @@ workflow_plugin = "agtx"
 base_branch = "$BaseBranch"
 
 [agents]
+research = "codex"
 planning = "codex"
 running = "codex"
 review = "codex"
@@ -147,8 +148,8 @@ application stack, key source directories, and runtime notes once known.
   relevant files, persisted decisions, verification commands, risks, and the
   condition that should escalate to the user.
 - Move only a small number of tasks into Planning or Running at once.
-- Codex is the default execution agent for Planning, Running, Review, and the
-  experimental orchestrator.
+- Codex is the default execution agent for Research, Planning, Running, Review,
+  and the experimental orchestrator.
 - Human review owns merge/Done. Do not silently mark work Done.
 
 ## Local agtx Setup
