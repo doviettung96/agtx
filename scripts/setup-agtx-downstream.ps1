@@ -39,6 +39,35 @@ function Write-FileIfMissing([string]$Path, [string]$Content) {
     }
 }
 
+function Convert-ToClaudeCommand([string]$Content, [string]$CommandName) {
+    return $Content -replace "(?m)^name:\s*agtx-[^\r\n]+", "name: agtx:$CommandName"
+}
+
+function Deploy-AgtxDiscussionSkills([string]$TemplateRoot) {
+    $skillMap = @(
+        @{ Name = "brainstorm"; Source = Join-Path $TemplateRoot "skills\brainstorm\SKILL.md" },
+        @{ Name = "sweep"; Source = Join-Path $TemplateRoot "skills\sweep\SKILL.md" }
+    )
+
+    foreach ($skill in $skillMap) {
+        if (-not (Test-Path -LiteralPath $skill.Source)) {
+            throw "Missing bundled agtx skill: $($skill.Source)"
+        }
+
+        $content = Get-Content -LiteralPath $skill.Source -Raw
+
+        $codexDir = Join-Path ".codex\skills" ("agtx-" + $skill.Name)
+        Ensure-Directory $codexDir
+        Set-Content -LiteralPath (Join-Path $codexDir "SKILL.md") -Value $content -NoNewline
+
+        $claudeDir = ".claude\commands\agtx"
+        Ensure-Directory $claudeDir
+        $claudeContent = Convert-ToClaudeCommand $content $skill.Name
+        Set-Content -LiteralPath (Join-Path $claudeDir ($skill.Name + ".md")) -Value $claudeContent -NoNewline
+    }
+}
+
+$templateRoot = Split-Path -Parent $PSScriptRoot
 $resolvedProject = [System.IO.Path]::GetFullPath($ProjectPath)
 Ensure-Directory $resolvedProject
 
@@ -173,6 +202,7 @@ Claude may be used for agtx brainstorm/sweep discussion capture. Do not use or
 recreate the old Agent Mail / Beads swarm workflow.
 '@
     Write-FileIfMissing "CLAUDE.md" $claudeContent
+    Deploy-AgtxDiscussionSkills $templateRoot
 
     if (-not $env:HOME) {
         $env:HOME = $env:USERPROFILE

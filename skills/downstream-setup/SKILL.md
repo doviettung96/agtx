@@ -40,6 +40,10 @@ of the agtx MCP board.
    ```powershell
    git status --short --branch
    git check-ignore -v .agtx/config.toml
+   Test-Path .codex/skills/agtx-brainstorm/SKILL.md
+   Test-Path .codex/skills/agtx-sweep/SKILL.md
+   Test-Path .claude/commands/agtx/brainstorm.md
+   Test-Path .claude/commands/agtx/sweep.md
    agtx trust
    tmux -V
    codex mcp list

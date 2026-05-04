@@ -56,6 +56,8 @@ The script:
   not already a git repo
 - ensures `.agtx/`, `.beads/`, and agent-local config directories are ignored
 - writes local `.agtx/config.toml` for Codex-backed agtx execution
+- deploys ignored local Codex and Claude `agtx-brainstorm` / `agtx-sweep`
+  skills into the downstream repo
 - creates or updates `AGENTS.md` with the agtx operating contract
 - creates `CLAUDE.md` as a thin pointer to `AGENTS.md` if missing
 - runs `agtx trust` for the project
@@ -68,6 +70,10 @@ Every agtx-managed downstream project should have:
 - `CLAUDE.md`: thin pointer back to `AGENTS.md`
 - `.gitignore`: ignores `.agtx/`, `.beads/`, and local agent config folders
 - `.agtx/config.toml`: local-only agtx project config
+- `.codex/skills/agtx-brainstorm/` and `.codex/skills/agtx-sweep/`:
+  ignored local Codex discussion/sweep skills
+- `.claude/commands/agtx/brainstorm.md` and `sweep.md`: ignored local Claude
+  discussion/sweep commands
 
 Recommended `.agtx/config.toml`:
 
@@ -84,18 +90,20 @@ review = "codex"
 
 ## Codex/Claude Session Prompt
 
-Use this when opening Codex or Claude in a prepared downstream repo:
+In a prepared downstream repo, the short flow is:
 
 ```text
-Read AGENTS.md first. Use agtx MCP as the board for this project.
-
-Brainstorm with me first. When the design is settled, propose feature-level
-agtx tasks with purpose, expected outcome, files/context, verification, risks,
-dependencies, and escalation conditions. Do not create tasks until I confirm.
-
-After I confirm, create the tasks in agtx. Do not implement in this discussion
-session unless I explicitly ask; agtx owns execution.
+Read AGENTS.md first.
 ```
+
+Then invoke the local skill:
+
+- Codex: `$agtx-brainstorm`, then `$agtx-sweep`
+- Claude: `/agtx:brainstorm`, then `/agtx:sweep`
+
+The brainstorm skill stays in discussion mode. The sweep skill proposes
+feature-level agtx tasks, stops for user confirmation, and only then creates
+tasks through MCP.
 
 ## Execution Session
 
@@ -132,6 +140,10 @@ claude mcp list
 Expected:
 
 - `.agtx/config.toml` is ignored
+- `.codex/skills/agtx-brainstorm/SKILL.md` and
+  `.codex/skills/agtx-sweep/SKILL.md` exist
+- `.claude/commands/agtx/brainstorm.md` and
+  `.claude/commands/agtx/sweep.md` exist
 - `agtx trust` succeeds
 - `tmux` is available
 - Codex and Claude list an `agtx` MCP server
