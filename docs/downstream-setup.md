@@ -33,12 +33,14 @@ PowerShell:
 $env:HOME = $env:USERPROFILE
 $env:Path = "$env:USERPROFILE\.local\bin;$env:USERPROFILE\.cargo\bin;C:\Program Files\Git\bin;$env:Path"
 
-codex mcp add agtx -- "$env:USERPROFILE\.local\bin\agtx.exe" mcp-serve .
-claude mcp add -s user agtx -- "$env:USERPROFILE\.local\bin\agtx.exe" mcp-serve .
+codex mcp add agtx --env HOME=$env:USERPROFILE -- "$env:USERPROFILE\.local\bin\agtx.exe" mcp-serve .
+claude mcp add -s user -e HOME=$env:USERPROFILE -- agtx "$env:USERPROFILE\.local\bin\agtx.exe" mcp-serve .
 ```
 
 Why `.` matters: the MCP server becomes project-scoped to the current working
 directory of the Codex/Claude session. Open the agent from the repo root.
+Why `HOME` matters: on this Windows shell, fresh agent sessions may not inherit
+`HOME`; agtx needs it to locate its config and database.
 
 ## Per-Project Setup
 
@@ -105,6 +107,10 @@ Then invoke the local skill:
 The brainstorm skill stays in discussion mode. The sweep skill proposes
 feature-level agtx tasks, stops for user confirmation, and only then creates
 tasks through MCP.
+
+You do not need to start the agtx TUI before using brainstorm/sweep. The MCP
+server can create and update board tasks by itself. Start `agtx --experimental`
+when you want the visible board and task execution/orchestrator host.
 
 ## Execution Session
 

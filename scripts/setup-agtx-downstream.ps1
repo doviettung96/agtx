@@ -214,15 +214,11 @@ recreate the old Agent Mail / Beads swarm workflow.
 
     if ($ConfigureAgentMcp) {
         $agtxExe = Join-Path $env:USERPROFILE ".local\bin\agtx.exe"
-        $codexList = codex mcp list 2>$null
-        if ($LASTEXITCODE -eq 0 -and ($codexList -notmatch "(?m)^agtx\b")) {
-            codex mcp add agtx -- $agtxExe mcp-serve . | Out-Host
-        }
+        codex mcp remove agtx 2>$null | Out-Null
+        codex mcp add agtx --env HOME=$env:USERPROFILE -- $agtxExe mcp-serve . | Out-Host
 
-        $claudeList = claude mcp list 2>$null
-        if ($LASTEXITCODE -eq 0 -and ($claudeList -notmatch "(?m)^agtx\b")) {
-            claude mcp add -s user agtx -- $agtxExe mcp-serve . | Out-Host
-        }
+        claude mcp remove -s user agtx 2>$null | Out-Null
+        claude mcp add -s user -e HOME=$env:USERPROFILE -- agtx $agtxExe mcp-serve . | Out-Host
     }
 
     Write-Host "agtx downstream setup complete: $resolvedProject"
